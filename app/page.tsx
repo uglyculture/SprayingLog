@@ -1,65 +1,131 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useState } from "react";
+import { getSupabase } from "@/lib/supabase";
+import { Material } from "@/lib/types";
+
+export default function NewEntry() {
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [materialId, setMaterialId] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [concentration, setConcentration] = useState("");
+  const [comment, setComment] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [suggestedDosage, setSuggestedDosage] = useState("");
+
+  useEffect(() => {
+    loadMaterials();
+  }, []);
+
+  async function loadMaterials() {
+    const { data } = await getSupabase()
+      .from("materials")
+      .select("*")
+      .order("name");
+    if (data) setMaterials(data);
+  }
+
+  function handleMaterialChange(id: string) {
+    setMaterialId(id);
+    const mat = materials.find((m) => m.id === id);
+    setSuggestedDosage(mat?.suggested_dosage || "");
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!materialId || !date) return;
+
+    setSaving(true);
+    const { error } = await getSupabase().from("spray_logs").insert({
+      date,
+      material_id: materialId,
+      concentration,
+      comment,
+    });
+
+    setSaving(false);
+    if (!error) {
+      setSuccess(true);
+      setConcentration("");
+      setComment("");
+      setTimeout(() => setSuccess(false), 2000);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div>
+      <h1 className="text-xl font-bold mb-4">New Spray Entry</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Date</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-3 py-3 text-base bg-white"
+            required
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Material</label>
+          <select
+            value={materialId}
+            onChange={(e) => handleMaterialChange(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-3 py-3 text-base bg-white"
+            required
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <option value="">Select material...</option>
+            {materials.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+          {suggestedDosage && (
+            <p className="text-sm text-green-700 mt-1">
+              Suggested: {suggestedDosage}
+            </p>
+          )}
         </div>
-      </main>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Concentration</label>
+          <input
+            type="text"
+            value={concentration}
+            onChange={(e) => setConcentration(e.target.value)}
+            placeholder="e.g. 1.5g/l"
+            className="w-full border border-slate-300 rounded-lg px-3 py-3 text-base bg-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Comment</label>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Optional notes..."
+            rows={3}
+            className="w-full border border-slate-300 rounded-lg px-3 py-3 text-base bg-white resize-none"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={saving || !materialId}
+          className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-400 text-white font-semibold py-4 rounded-lg text-lg transition-colors"
+        >
+          {saving ? "Saving..." : "Save Entry"}
+        </button>
+
+        {success && (
+          <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-3 rounded-lg text-center font-medium">
+            Saved!
+          </div>
+        )}
+      </form>
     </div>
   );
 }
