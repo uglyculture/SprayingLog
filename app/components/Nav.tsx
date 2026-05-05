@@ -7,8 +7,9 @@ export function Nav() {
   const pathname = usePathname();
 
   const links = [
-    { href: "/", label: "New Entry" },
+    { href: "/", label: "New" },
     { href: "/log", label: "Log" },
+    { href: "/calendar", label: "Calendar" },
     { href: "/materials", label: "Materials" },
   ];
 
