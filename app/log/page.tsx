@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
-import { SprayLog } from "@/lib/types";
+import { SpraySession } from "@/lib/types";
 
 export default function LogPage() {
-  const [logs, setLogs] = useState<SprayLog[]>([]);
+  const [sessions, setSessions] = useState<SpraySession[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterMaterial, setFilterMaterial] = useState("");
   const [materials, setMaterials] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
-    loadLogs();
+    loadSessions();
     loadMaterials();
   }, []);
 
@@ -23,31 +23,33 @@ export default function LogPage() {
     if (data) setMaterials(data);
   }
 
-  async function loadLogs() {
+  async function loadSessions() {
     setLoading(true);
     const { data } = await getSupabase()
-      .from("spray_logs")
-      .select("*, material:materials(*)")
+      .from("spray_sessions")
+      .select("*, items:spray_session_items(*, material:materials(*))")
       .order("date", { ascending: false });
-    if (data) setLogs(data);
+    if (data) setSessions(data);
     setLoading(false);
   }
 
-  async function deleteLog(id: string) {
+  async function deleteSession(id: string) {
     if (!confirm("Delete this entry?")) return;
-    await getSupabase().from("spray_logs").delete().eq("id", id);
-    setLogs(logs.filter((l) => l.id !== id));
+    await getSupabase().from("spray_sessions").delete().eq("id", id);
+    setSessions(sessions.filter((s) => s.id !== id));
   }
 
-  const filteredLogs = filterMaterial
-    ? logs.filter((l) => l.material_id === filterMaterial)
-    : logs;
+  const filtered = filterMaterial
+    ? sessions.filter((s) =>
+        s.items?.some((item) => item.material_id === filterMaterial)
+      )
+    : sessions;
 
-  const groupedByYear = filteredLogs.reduce<Record<string, SprayLog[]>>(
-    (acc, log) => {
-      const year = log.date.substring(0, 4);
+  const groupedByYear = filtered.reduce<Record<string, SpraySession[]>>(
+    (acc, session) => {
+      const year = session.date.substring(0, 4);
       if (!acc[year]) acc[year] = [];
-      acc[year].push(log);
+      acc[year].push(session);
       return acc;
     },
     {}
@@ -78,7 +80,7 @@ export default function LogPage() {
         </select>
       </div>
 
-      {filteredLogs.length === 0 ? (
+      {filtered.length === 0 ? (
         <p className="text-center text-slate-500 mt-8">No entries yet.</p>
       ) : (
         years.map((year) => (
@@ -87,34 +89,36 @@ export default function LogPage() {
               {year}
             </h2>
             <div className="space-y-2">
-              {groupedByYear[year].map((log) => (
+              {groupedByYear[year].map((session) => (
                 <div
-                  key={log.id}
+                  key={session.id}
                   className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm"
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm">
-                          {formatDate(log.date)}
-                        </span>
-                        <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-medium">
-                          {log.material?.name || "Unknown"}
-                        </span>
+                      <span className="font-medium text-sm">
+                        {formatDate(session.date)}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {session.items?.map((item) => (
+                          <span
+                            key={item.id}
+                            className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-medium"
+                          >
+                            {item.material?.name || "?"}
+                            {item.concentration &&
+                              ` ${item.concentration}${item.unit}`}
+                          </span>
+                        ))}
                       </div>
-                      {log.concentration && (
-                        <p className="text-sm text-slate-600 mt-1">
-                          {log.concentration}
-                        </p>
-                      )}
-                      {log.comment && (
-                        <p className="text-sm text-slate-500 mt-1 italic">
-                          {log.comment}
+                      {session.comment && (
+                        <p className="text-sm text-slate-500 mt-1.5 italic">
+                          {session.comment}
                         </p>
                       )}
                     </div>
                     <button
-                      onClick={() => deleteLog(log.id)}
+                      onClick={() => deleteSession(session.id)}
                       className="text-slate-400 hover:text-red-500 p-1 text-xs"
                     >
                       Del

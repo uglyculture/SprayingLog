@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { Material } from "@/lib/types";
 
+const UNITS = ["g/l", "ml/l", "ml/10l", "mg/l", ""];
+
 export default function MaterialsPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
@@ -11,6 +13,7 @@ export default function MaterialsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [suggestedDosage, setSuggestedDosage] = useState("");
+  const [defaultUnit, setDefaultUnit] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -32,6 +35,7 @@ export default function MaterialsPage() {
     setEditingId(material.id);
     setName(material.name);
     setSuggestedDosage(material.suggested_dosage);
+    setDefaultUnit(material.default_unit);
     setNotes(material.notes);
     setShowForm(true);
   }
@@ -40,6 +44,7 @@ export default function MaterialsPage() {
     setEditingId(null);
     setName("");
     setSuggestedDosage("");
+    setDefaultUnit("");
     setNotes("");
     setShowForm(true);
   }
@@ -54,15 +59,17 @@ export default function MaterialsPage() {
     if (!name.trim()) return;
 
     setSaving(true);
+    const payload = {
+      name: name.trim(),
+      suggested_dosage: suggestedDosage,
+      default_unit: defaultUnit,
+      notes,
+    };
+
     if (editingId) {
-      await getSupabase()
-        .from("materials")
-        .update({ name: name.trim(), suggested_dosage: suggestedDosage, notes })
-        .eq("id", editingId);
+      await getSupabase().from("materials").update(payload).eq("id", editingId);
     } else {
-      await getSupabase()
-        .from("materials")
-        .insert({ name: name.trim(), suggested_dosage: suggestedDosage, notes });
+      await getSupabase().from("materials").insert(payload);
     }
     setSaving(false);
     setShowForm(false);
@@ -71,8 +78,12 @@ export default function MaterialsPage() {
   }
 
   async function deleteMaterial(id: string) {
-    if (!confirm("Delete this material? Only works if no log entries use it.")) return;
-    const { error } = await getSupabase().from("materials").delete().eq("id", id);
+    if (!confirm("Delete this material? Only works if no log entries use it."))
+      return;
+    const { error } = await getSupabase()
+      .from("materials")
+      .delete()
+      .eq("id", id);
     if (error) {
       alert("Cannot delete: this material is used in log entries.");
     } else {
@@ -113,17 +124,33 @@ export default function MaterialsPage() {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Suggested Dosage
-            </label>
-            <input
-              type="text"
-              value={suggestedDosage}
-              onChange={(e) => setSuggestedDosage(e.target.value)}
-              placeholder="e.g. 1.5g/l"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-base bg-white"
-            />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-1">
+                Suggested Dosage
+              </label>
+              <input
+                type="text"
+                value={suggestedDosage}
+                onChange={(e) => setSuggestedDosage(e.target.value)}
+                placeholder="e.g. 1.25-1.5"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-base bg-white"
+              />
+            </div>
+            <div className="w-28">
+              <label className="block text-sm font-medium mb-1">Unit</label>
+              <select
+                value={defaultUnit}
+                onChange={(e) => setDefaultUnit(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-2 py-2 text-base bg-white"
+              >
+                {UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u || "None"}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Notes</label>
@@ -163,9 +190,9 @@ export default function MaterialsPage() {
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <h3 className="font-semibold">{m.name}</h3>
-                {m.suggested_dosage && (
+                {(m.suggested_dosage || m.default_unit) && (
                   <p className="text-sm text-green-700">
-                    Dosage: {m.suggested_dosage}
+                    Dosage: {m.suggested_dosage} {m.default_unit}
                   </p>
                 )}
                 {m.notes && (

@@ -2,16 +2,24 @@ export interface Material {
   id: string;
   name: string;
   suggested_dosage: string;
+  default_unit: string;
   notes: string;
   created_at: string;
 }
 
-export interface SprayLog {
+export interface SpraySessionItem {
   id: string;
-  date: string;
+  session_id: string;
   material_id: string;
   concentration: string;
+  unit: string;
+  material?: Material;
+}
+
+export interface SpraySession {
+  id: string;
+  date: string;
   comment: string;
   created_at: string;
-  material?: Material;
+  items?: SpraySessionItem[];
 }
